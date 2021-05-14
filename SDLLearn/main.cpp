@@ -25,12 +25,14 @@ enum KeyPressSurfaces
 };
 
 SDL_Renderer* renderer = NULL;
-SDL_Window* window = NULL;
+SDL_Window* window = NULL; // the window we render to
 
-SDL_Surface* gScreenSurface = NULL; /// the currently displayed image
-SDL_Surface* gHelloWorld = NULL;
+SDL_Surface* gScreenSurface = NULL; /// the surface contained by the image
+SDL_Surface* gHelloWorld = NULL; 
 
-SDL_Surface* gKeyPressSurfaces[KEY_PRESS_SURFACE_TOTAL];
+SDL_Surface* gKeyPressSurfaces[KEY_PRESS_SURFACE_TOTAL]; // the list of images corresponding to keypresses
+SDL_Surface* gCurrentSurface = NULL; // the currently displayed image
+
 
 int frameCount, timerFPS, lastFrame, fps;
 
@@ -69,8 +71,8 @@ bool init()
 void close()
 {
 	//Deallocate surface
-	SDL_FreeSurface(gHelloWorld);
-	gHelloWorld = NULL;
+	SDL_FreeSurface(gCurrentSurface);
+	gCurrentSurface = NULL;
 
 	//Destroy window
 	SDL_DestroyWindow(window);
@@ -82,25 +84,44 @@ void close()
 
 int main(int argc, char* args[]) {
 
+	init();
 
-	if (init() ) {
-		load_media();
-		SDL_BlitSurface(gHelloWorld, NULL, gScreenSurface, NULL);
-		SDL_UpdateWindowSurface(window);
-	}
-	else {
-		std::cout << "could not init window" << std::endl;
-	}
+	load_media();
 
-	SDL_Event e;
+	// Main loop flag
 	bool quit = false;
+
+	// Event handler
+	SDL_Event e;
+
+	// Set the default current surface
+
+	gCurrentSurface = gKeyPressSurfaces[KEY_PRESS_SURFACE_DEFAULT];
+
 	while (!quit) {
+
 		while (SDL_PollEvent(&e)) {
 			if (e.type == SDL_QUIT) {
 				quit = true;
 			}
+			else if (e.type == SDL_KEYDOWN) {
+				// Select surfaces based on key press
+				switch (e.key.keysym.sym) {
+				case SDLK_UP:
+					gCurrentSurface = gKeyPressSurfaces[KEY_PRESS_SURFACE_UP];
+					break;
+				default:
+					gKeyPressSurfaces[KEY_PRESS_SURFACE_DEFAULT];
+					break;
+				}
+			}
 		}
+		SDL_BlitSurface(gCurrentSurface, NULL, gScreenSurface, NULL);
+		SDL_UpdateWindowSurface(window);
 	}
+
+
+
 	close();
 	return 0;
 }
@@ -132,15 +153,34 @@ void draw() {
 	SDL_RenderPresent(renderer);
 }
 
-bool load_media() {
-	bool success = 0;
+SDL_Surface* load_surface(std::string path) {
 
-	gHelloWorld = SDL_LoadBMP("example.bmp");
-	if (gHelloWorld == NULL) {
+
+	SDL_Surface* loaded = SDL_LoadBMP(path.c_str());
+	if (loaded == NULL) {
 		printf("Unable to load image!");
-		success = false;
+	}
+
+	// Images loaded here are deallocated in the close function!
+	// Memory leaks are not a concern here. 
+
+	return loaded;
+
+}
+
+
+bool load_media() {
+	bool success = true;
+
+	gKeyPressSurfaces[KEY_PRESS_SURFACE_DEFAULT] = load_surface("example.bmp");
+	if (gKeyPressSurfaces[KEY_PRESS_SURFACE_DEFAULT] == NULL) {
+		std::cout << "Failed to load default image.\n";
+	}
+
+	gKeyPressSurfaces[KEY_PRESS_SURFACE_UP] = load_surface("alternate.bmp");
+	if (gKeyPressSurfaces[KEY_PRESS_SURFACE_DEFAULT] == NULL) {
+		std::cout << "Failed to load alternate image.\n";
 	}
 
 	return success;
-
 }
